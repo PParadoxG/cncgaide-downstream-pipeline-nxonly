@@ -1,0 +1,59 @@
+CNCgAIde NX
+Third-party components
+
+-------------------------------------------------------------------------------
+Apache Jena Fuseki
+  Path      install/fuseki/apache-jena-fuseki-<version>/  (downloaded by install/fuseki_install.py, not tracked)
+  Upstream  https://jena.apache.org/
+  Licence   Apache License 2.0
+
+  The RDF store and SPARQL server. Downloaded from the Apache mirror at install
+  time and checked against the published SHA-512; nothing of it is copied into
+  this repository.
+
+-------------------------------------------------------------------------------
+PyYAML
+  Path      src/nxline/vendor/yaml/
+  Upstream  https://github.com/yaml/pyyaml
+  Licence   MIT - full text at src/nxline/vendor/yaml/LICENSE
+
+  A vendored copy, because the NX journal runs inside NX's own Python
+  interpreter, which has neither this project's environment nor PYTHONPATH.
+
+-------------------------------------------------------------------------------
+three.js and OrbitControls
+  Path      src/web/static/vendor/three.module.js, src/web/static/vendor/OrbitControls.js
+  Upstream  https://github.com/mrdoob/three.js
+  Licence   MIT
+
+  The 3D view of the web interface. Unmodified copies; build identity in
+  src/web/static/vendor/VERSIONS.md.
+
+-------------------------------------------------------------------------------
+cytoscape.js
+  Path      src/web/static/vendor/cytoscape.min.js
+  Upstream  https://github.com/cytoscape/cytoscape.js
+  Licence   MIT
+
+  The feature graph view of the web interface.
+
+-------------------------------------------------------------------------------
+cytoscape-fcose, cose-base, layout-base
+  Path      src/web/static/vendor/cytoscape-fcose.js, cose-base.js, layout-base.js
+  Upstream  https://github.com/iVis-at-Bilkent
+  Licence   MIT
+
+  The graph layout used by the feature graph view; one dependency chain,
+  replaced together.
+
+-------------------------------------------------------------------------------
+Siemens NX
+
+  Not included, and not includable. The pipeline drives a local NX installation
+  through its own executables (NXBIN/step242.exe, NXBIN/run_journal.exe) and
+  reads its feature schema (UGII/customization_base.xml). NX is commercial
+  software under Siemens' licence; nothing from it is redistributed here.
+
+  The ontology quotes NX's declared class and attribute names and pins the
+  sha256 of the two installed XML files it was transcribed from, so that what
+  was read can be checked against a given install.

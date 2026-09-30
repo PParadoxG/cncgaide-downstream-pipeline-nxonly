@@ -1,0 +1,21 @@
+# Generated results: the store, translation cache, facts files, meshes, server logs
+runs/
+
+# Your STEP files stay yours; the sample part install/verify_install.py checks ships
+inputs/**
+!inputs/.gitkeep
+!inputs/STEPtest2.step
+
+# The Fuseki distribution is downloaded by install/fuseki_install.py
+install/fuseki/
+
+# Where NX is on this machine (template: config/nx_local.example.json)
+/config/nx_local.json
+
+# This machine's settings, among them the language model's API key (template: settings.example.json)
+/settings.json
+
+__pycache__/
+*.py[cod]
+*.log
+*.tmp

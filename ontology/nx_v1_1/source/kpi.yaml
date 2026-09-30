@@ -1,0 +1,123 @@
+head:
+  definedBy: pipeline
+  form: KPIType is a controlled vocabulary. A heuristic names the KPI types it affects (affectsKpi); when the
+    heuristic is not met the KPI moves in its worse direction (worseWhen). A KPIResult
+    carries one value of one type for one feature (kpiOfFeature) or for one simulation run. Feature-level results
+    are derived from geometry by the rules under derivations; run-level results are imported, never computed here.
+types:
+- id: kpi_machining_time
+  label: machining time
+  definition: Total machining time of a simulation run.
+  unit: s
+  kind: run
+  worseWhen: higher
+- id: kpi_tool_changes
+  label: tool changes
+  definition: Number of tool changes of a simulation run.
+  unit: count
+  kind: run
+  worseWhen: higher
+- id: kpi_tool_wear_proxy
+  label: tool wear proxy
+  definition: Process force or force collective over a simulation run, as a wear proxy.
+  unit: N
+  kind: run
+  worseWhen: higher
+- id: kpi_energy_consumption
+  label: energy consumption
+  definition: Energy demand of machining from the process model.
+  unit: J
+  kind: run
+  worseWhen: higher
+- id: kpi_material_removal_rate
+  label: material removal rate
+  definition: Material removed per unit time.
+  unit: mm3/s
+  kind: run
+  worseWhen: lower
+- id: kpi_collision_indicator
+  label: collision indicator
+  definition: Collision-free machinability of a feature, operationalised by kpi_min_required_tool_length and
+    kpi_max_permissible_tool_diameter against a machine magazine.
+  unit: bool|score
+  kind: feature
+  worseWhen: higher
+- id: kpi_rest_material_indicator
+  label: rest material indicator
+  definition: Residual material remaining after machining, for example in unreachable inner corners.
+  unit: mm3
+  kind: feature
+  worseWhen: higher
+- id: kpi_workpiece_stiffness
+  label: workpiece stiffness
+  definition: Workpiece stiffness at the machining location.
+  unit: N/um
+  kind: feature
+  worseWhen: lower
+- id: kpi_tool_stiffness
+  label: tool stiffness
+  definition: Stiffness of the tool required for machining, depending on stickout.
+  unit: N/um
+  kind: feature
+  worseWhen: higher
+- id: kpi_min_required_tool_length
+  label: minimum required tool length
+  definition: Smallest tool stickout length allowing complete collision-free machining of a feature.
+  unit: mm
+  kind: feature
+  worseWhen: higher
+- id: kpi_max_permissible_tool_diameter
+  label: maximum permissible tool diameter
+  definition: Largest tool diameter capable of completely machining a feature.
+  unit: mm
+  kind: feature
+  worseWhen: lower
+proxies:
+- quantity: derived_min_wall_thickness
+  proxyFor: kpi_workpiece_stiffness
+  definition: A thinner remaining wall means a lower local workpiece stiffness; the wall thickness stands in for the
+    stiffness, which needs material data to compute.
+derivations:
+- id: kpi_min_required_tool_length
+  kpiType: kpi_min_required_tool_length
+  appliesTo: [STEP*, HOLE_*, POCKET_*, SLOT_*, CORNER_NOTCH_*, SIDE_NOTCH_*, GROOVE_*]
+  usesAttributes: [DEPTH]
+  formula: DEPTH
+  sparql: |
+    GRAPH <{FACTS}> { ?f nx:DEPTH ?value }
+- id: kpi_max_permissible_tool_diameter_stepped
+  kpiType: kpi_max_permissible_tool_diameter
+  appliesTo: [STEP*]
+  usesAttributes: [DIAMETER_k]
+  formula: min over sections k of DIAMETER_k
+  sparql: |
+    { SELECT ?f (MIN(?d) AS ?value) WHERE {
+        GRAPH <{FACTS}> { ?f a ?c . ?f ?dp ?d }
+        GRAPH <{ONTOLOGY}> { ?c cg:section ?s . ?s cg:diameterAttribute ?dp }
+      } GROUP BY ?f }
+- id: kpi_max_permissible_tool_diameter_corner
+  kpiType: kpi_max_permissible_tool_diameter
+  appliesTo: [POCKET_CLOSED, POCKET_OPEN, POCKET_FREE_SHAPED_STRAIGHT, HOLE_FREE_SHAPED_STRAIGHT]
+  usesAttributes: [MIN_RADIUS]
+  formula: 2 * MIN_RADIUS
+  sparql: |
+    GRAPH <{FACTS}> { ?f nx:MIN_RADIUS ?r }
+    BIND(2 * ?r AS ?value)
+- id: kpi_max_permissible_tool_diameter_rectangular
+  kpiType: kpi_max_permissible_tool_diameter
+  appliesTo: [POCKET_RECTANGULAR_STRAIGHT, HOLE_RECTANGULAR_STRAIGHT, SLOT_RECTANGULAR, SLOT_OBROUND,
+    CORNER_NOTCH_RECTANGULAR]
+  usesAttributes: [WIDTH, LENGTH, RADIUS]
+  formula: min(WIDTH, LENGTH, 2 * RADIUS)
+  sparql: |
+    GRAPH <{FACTS}> { ?f nx:WIDTH ?w ; nx:LENGTH ?l ; nx:RADIUS ?r }
+    BIND(IF(?w < ?l, ?w, ?l) AS ?wl)
+    BIND(IF(?r > 0 && 2 * ?r < ?wl, 2 * ?r, ?wl) AS ?value)
+- id: kpi_max_permissible_tool_diameter_obround
+  kpiType: kpi_max_permissible_tool_diameter
+  appliesTo: [POCKET_OBROUND_STRAIGHT, HOLE_OBROUND_STRAIGHT]
+  usesAttributes: [LENGTH, RADIUS]
+  formula: min(LENGTH, 2 * RADIUS)
+  sparql: |
+    GRAPH <{FACTS}> { ?f nx:LENGTH ?l ; nx:RADIUS ?r }
+    BIND(IF(?r > 0 && 2 * ?r < ?l, 2 * ?r, ?l) AS ?value)

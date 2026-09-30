@@ -1,0 +1,378 @@
+head:
+  definedBy: pipeline
+  form: One rule per entry. appliesTo lists NX class names or patterns; the build expands a pattern to the
+    recognisable classes that declare every attribute in usesAttributes. condition is the WHERE body of a SPARQL
+    Update executed on the part graph; it binds ?outcome to cg:PASS or cg:FAIL and one ?v_<name> per entry of
+    values. A feature-scope condition sees ?f (the feature) and ?cls (its class); a pair-scope condition sees ?rel
+    (the relation), ?a and ?b (its ends) and ?clsA, ?clsB. Every threshold in usesThresholds is bound to ?<symbol>.
+    Graph placeholders {FACTS} and {ONTOLOGY} are substituted at run time. A feature in the domain that lacks a
+    value for an attribute in usesAttributes receives a NOT_EVALUABLE verdict from the shared gate rule; a
+    condition that does not match produces no verdict.
+  attributePatterns:
+    DIAMETER_k: every DIAMETER_<k> the class declares
+    DEPTH_k: every cumulative DEPTH_<k> the class declares
+heuristics:
+- id: H01
+  label: Hole depth-to-diameter ratio
+  statement: Keep the depth-to-diameter ratio of every section of a hole at or below t_hole_ld.
+  scope: feature
+  appliesTo: [STEP*]
+  usesAttributes: [DIAMETER_k, DEPTH_k, DEPTH]
+  usesRelations: []
+  usesThresholds: [t_hole_ld]
+  affectsKpi: [kpi_rest_material_indicator, kpi_machining_time, kpi_tool_wear_proxy]
+  values: [maxRatio, sectionCount]
+  condition: |
+    { SELECT ?f (MAX(?ratio) AS ?v_maxRatio) (COUNT(?s) AS ?v_sectionCount) WHERE {
+        GRAPH <{ONTOLOGY}> { ?c cg:section ?s . ?s cg:diameterAttribute ?dp ; cg:depthToAttribute ?tp }
+        GRAPH <{FACTS}> { ?f a ?c ; ?dp ?dia ; ?tp ?to }
+        { GRAPH <{ONTOLOGY}> { ?s cg:depthFromAttribute ?fp } GRAPH <{FACTS}> { ?f ?fp ?from } }
+        UNION
+        { GRAPH <{ONTOLOGY}> { ?s cg:index 1 } BIND(0 AS ?from) }
+        FILTER(?dia > 0)
+        BIND((?to - ?from) / ?dia AS ?ratio)
+      } GROUP BY ?f }
+    BIND(IF(?v_maxRatio <= ?t_hole_ld, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H03
+  label: Pocket depth-to-width ratio
+  statement: Keep the depth of a rectangular pocket at or below t_pocket_ld times the smaller of its width and length.
+  scope: feature
+  appliesTo: [POCKET_RECTANGULAR_STRAIGHT]
+  usesAttributes: [DEPTH, WIDTH, LENGTH]
+  usesRelations: []
+  usesThresholds: [t_pocket_ld]
+  affectsKpi: [kpi_tool_wear_proxy, kpi_rest_material_indicator, kpi_collision_indicator]
+  values: [DEPTH, WIDTH, LENGTH, restrictiveWidth, depthToMinWidth]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:DEPTH ?v_DEPTH ; nx:WIDTH ?v_WIDTH ; nx:LENGTH ?v_LENGTH }
+    BIND(IF(?v_WIDTH < ?v_LENGTH, ?v_WIDTH, ?v_LENGTH) AS ?v_restrictiveWidth)
+    FILTER(?v_restrictiveWidth > 0)
+    BIND(?v_DEPTH / ?v_restrictiveWidth AS ?v_depthToMinWidth)
+    BIND(IF(?v_depthToMinWidth <= ?t_pocket_ld, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H06
+  label: Minimum round-boss diameter
+  statement: Keep the diameter of a round boss at or above t_boss_diameter.
+  scope: feature
+  appliesTo: [BOSS_ROUND_STRAIGHT, BOSS_ROUND_STRAIGHT_THREAD]
+  usesAttributes: [DIAMETER]
+  usesRelations: []
+  usesThresholds: [t_boss_diameter]
+  affectsKpi: [kpi_workpiece_stiffness]
+  values: [DIAMETER]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:DIAMETER ?v_DIAMETER }
+    BIND(IF(?v_DIAMETER >= ?t_boss_diameter, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H07
+  label: Round-boss height-to-diameter ratio
+  statement: Keep the height of a round boss at or below t_boss_hd times its diameter.
+  scope: feature
+  appliesTo: [BOSS_ROUND_STRAIGHT, BOSS_ROUND_STRAIGHT_THREAD]
+  usesAttributes: [DEPTH, DIAMETER]
+  usesRelations: []
+  usesThresholds: [t_boss_hd]
+  affectsKpi: [kpi_rest_material_indicator, kpi_workpiece_stiffness]
+  values: [DEPTH, DIAMETER, heightLimit, heightToDiameter]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:DEPTH ?v_DEPTH ; nx:DIAMETER ?v_DIAMETER }
+    FILTER(?v_DIAMETER > 0)
+    BIND(?t_boss_hd * ?v_DIAMETER AS ?v_heightLimit)
+    BIND(?v_DEPTH / ?v_DIAMETER AS ?v_heightToDiameter)
+    BIND(IF(?v_DEPTH <= ?v_heightLimit, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H10
+  label: Minimum pocket corner radius
+  statement: Keep the minimum concave internal corner radius of a pocket at or above t_corner_radius.
+  scope: feature
+  appliesTo: [POCKET_CLOSED, POCKET_OPEN, POCKET_FREE_SHAPED_STRAIGHT]
+  usesAttributes: [MIN_RADIUS]
+  usesRelations: []
+  usesThresholds: [t_corner_radius]
+  affectsKpi: [kpi_tool_changes]
+  values: [MIN_RADIUS]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:MIN_RADIUS ?v_MIN_RADIUS }
+    BIND(IF(?v_MIN_RADIUS >= ?t_corner_radius, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H11
+  label: Minimum remaining pocket floor thickness
+  statement: Keep the remaining floor thickness below a pocket at or above t_floor.
+  scope: feature
+  appliesTo: [POCKET_*]
+  usesAttributes: [derived_floor_thickness]
+  usesRelations: []
+  usesThresholds: [t_floor]
+  affectsKpi: [kpi_tool_wear_proxy, kpi_rest_material_indicator, kpi_collision_indicator]
+  values: [derived_floor_thickness]
+  condition: |
+    GRAPH <{FACTS}> { ?f cg:derived_floor_thickness ?v_derived_floor_thickness }
+    BIND(IF(?v_derived_floor_thickness >= ?t_floor, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H12
+  label: Minimum web between holes
+  statement: Keep the material web between two parallel holes, the axis spacing minus the mean of the two entry
+    diameters, at or above t_hole_web.
+  scope: pair
+  relationType: HOLE_SPACING
+  appliesTo: [STEP*]
+  usesAttributes: [DIAMETER_1]
+  usesRelations: [HOLE_SPACING]
+  usesThresholds: [t_hole_web]
+  affectsKpi: [kpi_collision_indicator, kpi_workpiece_stiffness]
+  values: [axisSpacing, entryDiameterA, entryDiameterB, web]
+  condition: |
+    GRAPH <{ONTOLOGY}> { ?clsA cg:entryDiameterAttribute ?dpA . ?clsB cg:entryDiameterAttribute ?dpB }
+    GRAPH <{FACTS}> { ?rel cg:axisSpacing ?v_axisSpacing . ?a ?dpA ?v_entryDiameterA . ?b ?dpB ?v_entryDiameterB }
+    BIND(?v_axisSpacing - (?v_entryDiameterA + ?v_entryDiameterB) / 2 AS ?v_web)
+    BIND(IF(?v_web >= ?t_hole_web, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H13
+  label: Hole coaxial with its boss
+  statement: When a hole is located on a round boss, at least one hole located on that boss is coaxial with it.
+  scope: feature
+  appliesTo: [BOSS_ROUND_STRAIGHT, BOSS_ROUND_STRAIGHT_THREAD]
+  usesAttributes: []
+  usesRelations: [LOCATED_ON, COAXIAL]
+  usesThresholds: []
+  affectsKpi: [kpi_workpiece_stiffness]
+  values: [holeCount, coaxialHoleCount]
+  condition: |
+    { SELECT ?f (COUNT(DISTINCT ?h) AS ?v_holeCount) (COUNT(DISTINCT ?hc) AS ?v_coaxialHoleCount) WHERE {
+        GRAPH <{FACTS}> { ?loc cg:relationType cg:LOCATED_ON ; cg:terminal ?t .
+                          ?t cg:hostOwner ?f ; cg:terminalFeature ?h . ?h a ?hcls }
+        GRAPH <{ONTOLOGY}> { ?hcls rdfs:subClassOf* ?fam }
+        VALUES ?fam { nx:STEP nx:HOLES }
+        OPTIONAL { GRAPH <{FACTS}> { ?cx cg:relationType cg:COAXIAL .
+                                     { ?cx cg:from ?h ; cg:to ?f } UNION { ?cx cg:from ?f ; cg:to ?h } }
+                   BIND(?h AS ?hc) }
+      } GROUP BY ?f }
+    FILTER(?v_holeCount > 0)
+    BIND(IF(?v_coaxialHoleCount > 0, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H15
+  label: Minimum pocket-to-pocket clearance
+  statement: Keep the side-wall clearance between two pockets at or above t_pocket_gap.
+  scope: pair
+  relationType: POCKET_CLEARANCE
+  appliesTo: [POCKET_*]
+  usesAttributes: []
+  usesRelations: [POCKET_CLEARANCE]
+  usesThresholds: [t_pocket_gap]
+  affectsKpi: [kpi_collision_indicator, kpi_workpiece_stiffness]
+  values: [pocketClearance]
+  condition: |
+    GRAPH <{FACTS}> { ?rel cg:pocketClearance ?v_pocketClearance }
+    BIND(IF(?v_pocketClearance >= ?t_pocket_gap, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H16
+  label: Minimum slot-to-slot clearance
+  statement: Keep the opening clearance between two slots at or above t_slot_gap.
+  scope: pair
+  relationType: SLOT_CLEARANCE
+  appliesTo: [SLOT_*]
+  usesAttributes: []
+  usesRelations: [SLOT_CLEARANCE]
+  usesThresholds: [t_slot_gap]
+  affectsKpi: [kpi_collision_indicator, kpi_workpiece_stiffness]
+  values: [slotClearance]
+  condition: |
+    GRAPH <{FACTS}> { ?rel cg:slotClearance ?v_slotClearance }
+    BIND(IF(?v_slotClearance >= ?t_slot_gap, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H17
+  label: Minimum slot width
+  statement: Keep the width of a slot at or above t_slot_width.
+  scope: feature
+  appliesTo: [SLOT_90_DEGREE, SLOT_OBROUND, SLOT_PARTIAL_OBROUND, SLOT_PARTIAL_RECTANGULAR, SLOT_PARTIAL_ROUND,
+    SLOT_PARTIAL_U_SHAPED, SLOT_RECTANGULAR, SLOT_UPSIDE_DOWN_DOVE_TAIL, SLOT_V_SHAPED]
+  usesAttributes: [WIDTH]
+  usesRelations: []
+  usesThresholds: [t_slot_width]
+  affectsKpi: [kpi_tool_changes]
+  values: [WIDTH]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:WIDTH ?v_WIDTH }
+    BIND(IF(?v_WIDTH >= ?t_slot_width, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H18
+  label: Common base-hole diameter for nearby holes
+  statement: Two holes whose axis spacing is at most t_hole_near times the larger base-hole diameter share one
+    base-hole diameter within tol_diameter.
+  scope: pair
+  relationType: HOLE_SPACING
+  appliesTo: [STEP*]
+  usesAttributes: [DIAMETER_n]
+  usesRelations: [HOLE_SPACING]
+  usesThresholds: [t_hole_near, tol_diameter]
+  affectsKpi: [kpi_tool_changes]
+  values: [axisSpacing, baseDiameterA, baseDiameterB, nearGate, diameterDifference]
+  condition: |
+    GRAPH <{ONTOLOGY}> { ?clsA cg:baseDiameterAttribute ?dpA . ?clsB cg:baseDiameterAttribute ?dpB }
+    GRAPH <{FACTS}> { ?rel cg:axisSpacing ?v_axisSpacing . ?a ?dpA ?v_baseDiameterA . ?b ?dpB ?v_baseDiameterB }
+    BIND(?t_hole_near * IF(?v_baseDiameterA > ?v_baseDiameterB, ?v_baseDiameterA, ?v_baseDiameterB) AS ?v_nearGate)
+    FILTER(?v_axisSpacing <= ?v_nearGate)
+    BIND(ABS(?v_baseDiameterA - ?v_baseDiameterB) AS ?v_diameterDifference)
+    BIND(IF(?v_diameterDifference <= ?tol_diameter, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H19
+  label: Pocket corner-radius-to-depth ratio
+  statement: Keep the minimum concave internal corner radius of a pocket at or above t_corner_depth_ratio times
+    its depth.
+  scope: feature
+  appliesTo: [POCKET_CLOSED, POCKET_OPEN, POCKET_FREE_SHAPED_STRAIGHT]
+  usesAttributes: [MIN_RADIUS, DEPTH]
+  usesRelations: []
+  usesThresholds: [t_corner_depth_ratio]
+  affectsKpi: [kpi_tool_wear_proxy, kpi_machining_time]
+  values: [MIN_RADIUS, DEPTH, cornerRadiusToDepth]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:MIN_RADIUS ?v_MIN_RADIUS ; nx:DEPTH ?v_DEPTH }
+    FILTER(?v_DEPTH > 0)
+    BIND(?v_MIN_RADIUS / ?v_DEPTH AS ?v_cornerRadiusToDepth)
+    BIND(IF(?v_cornerRadiusToDepth >= ?t_corner_depth_ratio, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H21
+  label: Vertical pocket walls
+  statement: Keep the deviation of the pocket walls from vertical at or below tol_draft_zero.
+  scope: feature
+  appliesTo: [POCKET_CLOSED, POCKET_OPEN]
+  usesAttributes: [MIN_SIDE_ANGLE]
+  usesRelations: []
+  usesThresholds: [tol_draft_zero]
+  affectsKpi: [kpi_machining_time]
+  values: [MIN_SIDE_ANGLE, draftFromVertical]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:MIN_SIDE_ANGLE ?v_MIN_SIDE_ANGLE }
+    BIND(90 - ?v_MIN_SIDE_ANGLE AS ?v_draftFromVertical)
+    BIND(IF(?v_draftFromVertical <= ?tol_draft_zero, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H22
+  label: Entry blind hole for a deep pocket
+  statement: A pocket at least t_pocket_entry_depth deep has a blind hole located on it as a plunge entry.
+  scope: feature
+  appliesTo: [POCKET_*]
+  usesAttributes: [DEPTH]
+  usesRelations: [LOCATED_ON]
+  usesThresholds: [t_pocket_entry_depth]
+  affectsKpi: [kpi_tool_changes, kpi_machining_time]
+  values: [DEPTH, entryHoleCount]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:DEPTH ?v_DEPTH }
+    FILTER(?v_DEPTH >= ?t_pocket_entry_depth)
+    { SELECT ?f (COUNT(DISTINCT ?h) AS ?v_entryHoleCount) WHERE {
+        GRAPH <{FACTS}> { ?f a ?c }
+        OPTIONAL {
+          GRAPH <{FACTS}> { ?loc cg:relationType cg:LOCATED_ON ; cg:terminal ?t .
+                            ?t cg:hostOwner ?f ; cg:terminalFeature ?h . ?h a ?hcls }
+          GRAPH <{ONTOLOGY}> { ?hcls rdfs:subClassOf* nx:STEP ; cg:blind true }
+        }
+      } GROUP BY ?f }
+    BIND(IF(?v_entryHoleCount > 0, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H23
+  label: Slot depth-to-width ratio
+  statement: Keep the depth of a slot at or below t_slot_ld times its width.
+  scope: feature
+  appliesTo: [SLOT_90_DEGREE, SLOT_OBROUND, SLOT_PARTIAL_OBROUND, SLOT_PARTIAL_RECTANGULAR, SLOT_PARTIAL_ROUND,
+    SLOT_PARTIAL_U_SHAPED, SLOT_RECTANGULAR, SLOT_UPSIDE_DOWN_DOVE_TAIL, SLOT_V_SHAPED]
+  usesAttributes: [DEPTH, WIDTH]
+  usesRelations: []
+  usesThresholds: [t_slot_ld]
+  affectsKpi: [kpi_machining_time, kpi_tool_wear_proxy]
+  values: [DEPTH, WIDTH, depthToWidth]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:DEPTH ?v_DEPTH ; nx:WIDTH ?v_WIDTH }
+    FILTER(?v_WIDTH > 0)
+    BIND(?v_DEPTH / ?v_WIDTH AS ?v_depthToWidth)
+    BIND(IF(?v_depthToWidth <= ?t_slot_ld, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H28
+  label: Minimum blind-hole floor thickness
+  statement: Keep the remaining material below the bottom of a blind hole at or above t_floor.
+  scope: feature
+  appliesTo: [STEP*POCKET]
+  usesAttributes: [derived_floor_thickness]
+  usesRelations: []
+  usesThresholds: [t_floor]
+  affectsKpi: [kpi_workpiece_stiffness]
+  values: [derived_floor_thickness]
+  condition: |
+    GRAPH <{FACTS}> { ?f cg:derived_floor_thickness ?v_derived_floor_thickness }
+    BIND(IF(?v_derived_floor_thickness >= ?t_floor, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H37
+  label: Minimum clearance around a boss
+  statement: Keep the free space around a boss at or above t_boss_clearance.
+  scope: feature
+  appliesTo: [BOSS_*]
+  usesAttributes: [derived_min_clearance]
+  usesRelations: []
+  usesThresholds: [t_boss_clearance]
+  affectsKpi: [kpi_machining_time, kpi_collision_indicator]
+  values: [derived_min_clearance]
+  condition: |
+    GRAPH <{FACTS}> { ?f cg:derived_min_clearance ?v_derived_min_clearance }
+    BIND(IF(?v_derived_min_clearance >= ?t_boss_clearance, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H38
+  label: Rectangular-boss slenderness ratio
+  statement: Keep the height of a rectangular boss at or below t_boss_slenderness times the smaller of its width
+    and length.
+  scope: feature
+  appliesTo: [BOSS_RECTANGULAR_STRAIGHT]
+  usesAttributes: [DEPTH, WIDTH, LENGTH]
+  usesRelations: []
+  usesThresholds: [t_boss_slenderness]
+  affectsKpi: [kpi_workpiece_stiffness, kpi_tool_wear_proxy]
+  values: [DEPTH, WIDTH, LENGTH, minThickness, heightToMinThickness]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:DEPTH ?v_DEPTH ; nx:WIDTH ?v_WIDTH ; nx:LENGTH ?v_LENGTH }
+    BIND(IF(?v_WIDTH < ?v_LENGTH, ?v_WIDTH, ?v_LENGTH) AS ?v_minThickness)
+    FILTER(?v_minThickness > 0)
+    BIND(?v_DEPTH / ?v_minThickness AS ?v_heightToMinThickness)
+    BIND(IF(?v_heightToMinThickness <= ?t_boss_slenderness, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H43
+  label: Minimum through-cut corner radius
+  statement: Keep the minimum concave internal corner radius of a through cut at or above t_throughcut_corner_radius.
+  scope: feature
+  appliesTo: [HOLE_FREE_SHAPED_STRAIGHT]
+  usesAttributes: [MIN_RADIUS]
+  usesRelations: []
+  usesThresholds: [t_throughcut_corner_radius]
+  affectsKpi: [kpi_machining_time, kpi_tool_changes]
+  values: [MIN_RADIUS]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:MIN_RADIUS ?v_MIN_RADIUS }
+    BIND(IF(?v_MIN_RADIUS >= ?t_throughcut_corner_radius, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H46
+  label: Minimum intersecting-hole angle
+  statement: Keep the crossing angle between two intersecting holes at or above t_crossing_angle.
+  scope: pair
+  relationType: INTERSECTS
+  appliesTo: [STEP*]
+  usesAttributes: []
+  usesRelations: [INTERSECTS]
+  usesThresholds: [t_crossing_angle]
+  affectsKpi: [kpi_rest_material_indicator, kpi_tool_wear_proxy]
+  values: [crossingAngle]
+  condition: |
+    GRAPH <{FACTS}> { ?rel cg:crossingAngle ?v_crossingAngle }
+    BIND(IF(?v_crossingAngle >= ?t_crossing_angle, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H51
+  label: Minimum remaining wall thickness
+  statement: Keep the remaining wall thickness around a removal feature at or above t_min_wall.
+  scope: feature
+  appliesTo: [STEP*, SLOT_*, POCKET_*, HOLE_*]
+  usesAttributes: [derived_min_wall_thickness]
+  usesRelations: []
+  usesThresholds: [t_min_wall]
+  affectsKpi: [kpi_workpiece_stiffness]
+  values: [derived_min_wall_thickness]
+  condition: |
+    GRAPH <{FACTS}> { ?f cg:derived_min_wall_thickness ?v_derived_min_wall_thickness }
+    BIND(IF(?v_derived_min_wall_thickness >= ?t_min_wall, cg:PASS, cg:FAIL) AS ?outcome)
+- id: H53
+  label: Standard V-slot tool angle
+  statement: Use a V-slot included angle that is one of T_v_tool_angles within tol_angle.
+  scope: feature
+  appliesTo: [SLOT_V_SHAPED, SLOT_DOVE_TAIL, SLOT_UPSIDE_DOWN_DOVE_TAIL]
+  usesAttributes: [ANGLE]
+  usesRelations: []
+  usesThresholds: [T_v_tool_angles, tol_angle]
+  affectsKpi: [kpi_tool_changes]
+  values: [ANGLE, matchingStandardAngles]
+  condition: |
+    GRAPH <{FACTS}> { ?f nx:ANGLE ?v_ANGLE }
+    OPTIONAL {
+      SELECT ?f (COUNT(?m) AS ?matches) WHERE {
+        GRAPH <{FACTS}> { ?f nx:ANGLE ?ang }
+        GRAPH <{ONTOLOGY}> { cg:T_v_tool_angles cg:member ?m . cg:tol_angle cg:value ?tol }
+        FILTER(ABS(?ang - ?m) <= ?tol)
+      } GROUP BY ?f
+    }
+    BIND(COALESCE(?matches, 0) AS ?v_matchingStandardAngles)
+    BIND(IF(?v_matchingStandardAngles > 0, cg:PASS, cg:FAIL) AS ?outcome)

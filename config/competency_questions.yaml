@@ -1,0 +1,173 @@
+# Questions the store is expected to answer, as SPARQL.
+#
+# Each one starts at the index graph, because that is where "current" is
+# written: the index names the facts graph and the derived graph of every
+# part, so a question asked this way can never read a graph an older build
+# left behind.  {INDEX} and {ONTOLOGY} stand for the index graph and the
+# ontology graph now in force; the server substitutes them, exactly as it
+# does for the rules.
+#
+# The web interface lists these on the query page and runs them read-only;
+# they are also the acceptance list for the vocabulary - a question that can
+# no longer be asked is a change to the ontology, not to the page.
+#
+# The prefixes cg:, nx:, rdf:, rdfs:, xsd:, skos: and owl: are in scope.
+
+head:
+  definedBy: pipeline
+  form: One entry per question. id is stable, question is what a reader asks, sparql is a read-only query.
+
+questions:
+
+- id: cq01
+  question: Which parts are in the store, and how many features did NX find in each?
+  sparql: |
+    SELECT ?partId (COUNT(?f) AS ?features) WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?g }
+      GRAPH ?g { ?f cg:partOf ?part ; cg:nodeId ?nodeId }
+    }
+    GROUP BY ?partId
+    ORDER BY DESC(?features)
+
+- id: cq02
+  question: Which parts hold at least three stepped holes?
+  sparql: |
+    SELECT ?partId (COUNT(?f) AS ?holes) WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?g }
+      GRAPH <{ONTOLOGY}> { ?cls rdfs:subClassOf* nx:STEP }
+      GRAPH ?g { ?f cg:partOf ?part ; a ?cls }
+    }
+    GROUP BY ?partId
+    HAVING (COUNT(?f) >= 3)
+    ORDER BY DESC(?holes)
+
+- id: cq03
+  question: Which features do not meet the hole depth-to-diameter rule, and by how much?
+  sparql: |
+    SELECT ?partId ?nodeId ?maxRatio ?limit WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?fg ; cg:derivedGraph ?dg }
+      GRAPH ?dg {
+        ?v a cg:Verdict ; cg:heuristic cg:H01 ; cg:outcome cg:FAIL ; cg:target ?f ;
+           cg:value [ cg:name "maxRatio" ; cg:value ?maxRatio ] ;
+           cg:usedThreshold [ cg:threshold cg:t_hole_ld ; cg:value ?limit ]
+      }
+      GRAPH ?fg { ?f cg:nodeId ?nodeId }
+    }
+    ORDER BY DESC(?maxRatio)
+
+- id: cq04
+  question: How many verdicts of each outcome does every rule produce across the whole store?
+  sparql: |
+    SELECT ?rule ?outcome (COUNT(?v) AS ?verdicts) WHERE {
+      GRAPH <{INDEX}> { ?part cg:derivedGraph ?dg }
+      GRAPH ?dg { ?v a cg:Verdict ; cg:heuristic ?h ; cg:outcome ?o }
+      BIND(STRAFTER(STR(?h), "#") AS ?rule)
+      BIND(STRAFTER(STR(?o), "#") AS ?outcome)
+    }
+    GROUP BY ?rule ?outcome
+    ORDER BY ?rule ?outcome
+
+- id: cq05
+  question: Which feature of each part needs the longest tool, and how long is it?
+  sparql: |
+    SELECT ?partId ?nodeId ?length WHERE {
+      {
+        SELECT ?part (MAX(?value) AS ?length) WHERE {
+          GRAPH <{INDEX}> { ?part cg:derivedGraph ?dg }
+          GRAPH ?dg { ?k a cg:KPIResult ; cg:kpiType cg:kpi_min_required_tool_length ; cg:kpiValue ?value }
+        }
+        GROUP BY ?part
+      }
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?fg ; cg:derivedGraph ?dg }
+      GRAPH ?dg { ?k a cg:KPIResult ; cg:kpiType cg:kpi_min_required_tool_length ;
+                     cg:kpiValue ?length ; cg:kpiOfFeature ?f }
+      GRAPH ?fg { ?f cg:nodeId ?nodeId }
+    }
+    ORDER BY DESC(?length)
+
+- id: cq06
+  question: Which rules read a given threshold, and what value does it currently carry?
+  sparql: |
+    SELECT ?threshold ?value ?unit (GROUP_CONCAT(?rule ; separator=", ") AS ?rules) WHERE {
+      GRAPH <{ONTOLOGY}> {
+        ?t a cg:Threshold ; rdfs:label ?threshold .
+        OPTIONAL { ?t cg:value ?value }
+        OPTIONAL { ?t cg:unit ?unit }
+        ?h a cg:Heuristic ; cg:usesThreshold ?t .
+        BIND(STRAFTER(STR(?h), "#") AS ?rule)
+      }
+    }
+    GROUP BY ?threshold ?value ?unit
+    ORDER BY ?threshold
+
+- id: cq07
+  question: Which features could not be judged for want of an attribute, and which attribute is it?
+  sparql: |
+    SELECT ?partId ?nodeId ?rule ?attribute ?reason WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?fg ; cg:derivedGraph ?dg }
+      GRAPH ?dg { ?v a cg:Verdict ; cg:outcome cg:NOT_EVALUABLE ; cg:heuristic ?h ; cg:target ?f ; cg:gap ?gap .
+                  ?gap cg:attribute ?a . OPTIONAL { ?gap cg:reason ?reason } }
+      GRAPH ?fg { ?f cg:nodeId ?nodeId }
+      BIND(STRAFTER(STR(?a), "#") AS ?attribute)
+      BIND(STRAFTER(STR(?h), "#") AS ?rule)
+    }
+    ORDER BY ?partId ?nodeId
+
+- id: cq08
+  question: How are the diameters of the first hole section distributed across every part?
+  sparql: |
+    SELECT ?diameter (COUNT(?f) AS ?features) (GROUP_CONCAT(DISTINCT ?partId ; separator=", ") AS ?parts) WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?fg }
+      GRAPH ?fg { ?f cg:partOf ?part ; nx:DIAMETER_1 ?raw }
+      BIND(ROUND(?raw * 10) / 10 AS ?diameter)
+    }
+    GROUP BY ?diameter
+    ORDER BY ?diameter
+
+- id: cq09
+  question: Which pairs of holes leave the thinnest web of material between them?
+  sparql: |
+    SELECT ?partId ?a ?b ?web ?limit WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?fg ; cg:derivedGraph ?dg }
+      GRAPH ?dg { ?v a cg:Verdict ; cg:heuristic cg:H12 ; cg:target ?rel ;
+                     cg:value [ cg:name "web" ; cg:value ?web ] ;
+                     cg:usedThreshold [ cg:threshold cg:t_hole_web ; cg:value ?limit ] }
+      GRAPH ?fg { ?rel cg:from ?fa ; cg:to ?fb . ?fa cg:nodeId ?a . ?fb cg:nodeId ?b }
+    }
+    ORDER BY ?web
+    LIMIT 25
+
+- id: cq10
+  question: Which KPI does each rule affect, and how many verdicts stand behind it?
+  sparql: |
+    SELECT ?kpi ?rule (COUNT(?v) AS ?verdicts) WHERE {
+      GRAPH <{ONTOLOGY}> { ?h a cg:Heuristic ; cg:affectsKpi ?k }
+      GRAPH <{INDEX}> { ?part cg:derivedGraph ?dg }
+      GRAPH ?dg { ?v a cg:Verdict ; cg:heuristic ?h }
+      BIND(STRAFTER(STR(?k), "#") AS ?kpi)
+      BIND(STRAFTER(STR(?h), "#") AS ?rule)
+    }
+    GROUP BY ?kpi ?rule
+    ORDER BY ?kpi ?rule
+
+- id: cq11
+  question: Where did the geometry kernel refuse a measurement, and what reason did it give?
+  sparql: |
+    SELECT ?partId ?nodeId ?quantity ?reason WHERE {
+      GRAPH <{INDEX}> { ?part cg:partId ?partId ; cg:factsGraph ?fg }
+      GRAPH ?fg { ?f cg:partOf ?part ; cg:nodeId ?nodeId ; cg:measurementRefusal ?m .
+                  ?m cg:quantity ?q ; cg:reason ?reason }
+      BIND(STRAFTER(STR(?q), "#") AS ?quantity)
+    }
+    ORDER BY ?partId ?nodeId
+
+- id: cq12
+  question: Which classes has NX recognised anywhere in the store, and in how many parts?
+  sparql: |
+    SELECT ?class (COUNT(DISTINCT ?part) AS ?parts) (COUNT(?f) AS ?features) WHERE {
+      GRAPH <{INDEX}> { ?part cg:factsGraph ?fg }
+      GRAPH ?fg { ?f cg:partOf ?part ; cg:nodeId ?nodeId ; a ?cls }
+      BIND(STRAFTER(STR(?cls), "#") AS ?class)
+    }
+    GROUP BY ?class
+    ORDER BY DESC(?features)

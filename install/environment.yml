@@ -1,0 +1,17 @@
+# conda env create -f install/environment.yml
+#
+# The pipeline itself needs only the standard library plus PyYAML; numpy and
+# scipy serve the similarity solver; rdflib is used by the ontology build chain
+# and by the tests. The store is Java (Apache Jena Fuseki, JDK 21+), installed
+# separately by install/fuseki_install.py.
+name: cncgaide-nx
+channels:
+  - conda-forge
+dependencies:
+  - python=3.12
+  - pip
+  - pip:
+      - PyYAML==6.0.3
+      - numpy==2.2.6
+      - scipy==1.15.3
+      - rdflib==7.6.0

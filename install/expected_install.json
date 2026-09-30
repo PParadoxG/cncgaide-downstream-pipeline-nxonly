@@ -1,0 +1,49 @@
+{
+  "_comment": "Recorded by verify_install.py --record. Regenerate rather than edit: these numbers are an observation, not a setting.",
+  "counts": {
+    "derivedTriples": 813,
+    "faces": 42,
+    "factsTriples": 5144,
+    "featureTypes": {
+      "CORNER_NOTCH_STRAIGHT": 1,
+      "POCKET_RECTANGULAR_STRAIGHT": 1,
+      "STEP1POCKET": 5,
+      "STEP2POCKET": 1,
+      "SURFACE_PLANAR_RECTANGULAR": 6
+    },
+    "features": 14,
+    "kpiResults": {
+      "kpi_max_permissible_tool_diameter": 7,
+      "kpi_min_required_tool_length": 8
+    },
+    "relations": {
+      "COAXIAL": 1,
+      "HOLE_SPACING": 14,
+      "LOCATED_ON": 4
+    },
+    "verdicts": {
+      "H01": {
+        "PASS": 6
+      },
+      "H03": {
+        "PASS": 1
+      },
+      "H11": {
+        "PASS": 1
+      },
+      "H12": {
+        "PASS": 14
+      },
+      "H22": {
+        "FAIL": 1
+      },
+      "H28": {
+        "PASS": 6
+      },
+      "H51": {
+        "PASS": 7
+      }
+    }
+  },
+  "part": "STEPtest2"
+}

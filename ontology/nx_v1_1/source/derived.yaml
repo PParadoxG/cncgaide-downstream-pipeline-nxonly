@@ -1,0 +1,33 @@
+head:
+  definedBy: pipeline
+  form: A derived quantity is a datatype property of the feature, measured by the geometry kernel while the part is
+    open. A refused measurement is recorded as a MeasurementRefusal individual with a reason instead of a value.
+quantities:
+- name: derived_floor_thickness
+  label: floor thickness
+  definition: Remaining material below the floor of the feature, from the floor to the nearest opposing face of the part.
+  range: xsd:decimal
+  unit: mm
+  method: ray cast from the floor faces along the access direction to the first opposing surface
+  appliesTo:
+  - POCKET_*
+  - STEP*POCKET
+- name: derived_min_wall_thickness
+  label: minimum wall thickness
+  definition: Thinnest remaining wall between the side walls of the feature and the nearest other surface of the part.
+  range: xsd:decimal
+  unit: mm
+  method: ray cast from sampled side-wall normals into the material to the first other surface
+  appliesTo:
+  - STEP*
+  - SLOT_*
+  - POCKET_*
+  - HOLE_*
+- name: derived_min_clearance
+  label: minimum clearance
+  definition: Shortest free distance from the side walls of the feature to any other material of the part.
+  range: xsd:decimal
+  unit: mm
+  method: ray cast from sampled side-wall normals away from the material to the first other surface
+  appliesTo:
+  - BOSS_*

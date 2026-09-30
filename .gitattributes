@@ -1,0 +1,7 @@
+* text=auto eol=lf
+*.bin binary
+*.step binary
+*.stp binary
+*.STEP binary
+*.png binary
+src/web/static/vendor/** -text

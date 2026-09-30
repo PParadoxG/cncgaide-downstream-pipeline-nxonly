@@ -1,0 +1,46 @@
+head:
+  definedBy: pipeline
+  form: Presentation defaults read by the web interface. Nothing here enters the published ontology.
+backgroundTypes:
+- SURFACE_PLANAR
+- SURFACE_PLANAR_RECTANGULAR
+- SURFACE_PLANAR_ROUND
+hiddenByDefaultPatterns:
+- '*NOTCH*'
+featureColors:
+  STEP*: '#4a6dc0'
+  HOLE_*: '#2f7fb8'
+  POCKET_*: '#c0504a'
+  SLOT_*: '#d08a2a'
+  BOSS_*: '#5a9d4a'
+  CORNER_NOTCH_*: '#8a8a8a'
+  SIDE_NOTCH_*: '#8a8a8a'
+  GROOVE_*: '#8a5ac0'
+  SURFACE_PLANAR*: '#c9c9c9'
+  TURNING_*: '#b0a020'
+  WEDM_*: '#20a0a0'
+relationColors:
+  COAXIAL: '#00a6a6'
+  HOLE_SPACING: '#4a6dc0'
+  LOCATED_ON: '#a26000'
+  INTERSECTS: '#c02060'
+  POCKET_CLEARANCE: '#04884d'
+  SLOT_CLEARANCE: '#04884d'
+relationsVisibleByDefault: []
+kpiColors:
+  kpi_machining_time: '#4a6dc0'
+  kpi_tool_changes: '#d08a2a'
+  kpi_tool_wear_proxy: '#c0504a'
+  kpi_energy_consumption: '#8a5ac0'
+  kpi_material_removal_rate: '#5a9d4a'
+  kpi_collision_indicator: '#c02060'
+  kpi_rest_material_indicator: '#8a8a8a'
+  kpi_workpiece_stiffness: '#2f7fb8'
+  kpi_tool_stiffness: '#20a0a0'
+  kpi_min_required_tool_length: '#a26000'
+  kpi_max_permissible_tool_diameter: '#04884d'
+outcomeLabels:
+  PASS: met
+  FAIL: not met
+  NOT_EVALUABLE: not evaluable
+  NOT_APPLICABLE: not applicable

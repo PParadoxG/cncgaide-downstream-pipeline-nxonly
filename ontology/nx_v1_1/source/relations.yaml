@@ -1,0 +1,101 @@
+head:
+  definedBy: pipeline
+  form: Every relation is an individual of class FeatureRelation with relationType, from and to; its quantities
+    are datatype properties on that individual.
+types:
+- label: COAXIAL
+  definition: The feature axes of the two features lie on one infinite line, within the angular and offset tolerances.
+  directed: false
+  method: arithmetic over X/Y/Z_POSITION and X/Y/Z_ORIENTATION_D
+  allowedPairs:
+  - [STEP, STEP]
+  - [STEP, HOLES]
+  - [HOLES, HOLES]
+  - [STEP, BOSS_ROUND_STRAIGHT]
+  - [HOLES, BOSS_ROUND_STRAIGHT]
+  - [BOSS_ROUND_STRAIGHT, BOSS_ROUND_STRAIGHT]
+  properties: []
+- label: HOLE_SPACING
+  definition: The axes of the two hole-like features are parallel; the relation carries their perpendicular offset.
+  directed: false
+  method: arithmetic over X/Y/Z_POSITION and X/Y/Z_ORIENTATION_D
+  allowedPairs:
+  - [STEP, STEP]
+  - [STEP, HOLES]
+  - [HOLES, HOLES]
+  properties:
+  - name: axisSpacing
+    range: xsd:decimal
+    unit: mm
+    definition: Perpendicular distance between the two feature axes.
+- label: LOCATED_ON
+  definition: An opening of the source feature resolves outward to exactly one host face, owned by the target feature.
+  directed: false
+  method: B-Rep topology of the faces the two features own
+  allowedPairs:
+  - [STEP, MachiningFeature]
+  - [HOLES, MachiningFeature]
+  - [POCKETS, MachiningFeature]
+  - [BOSSES, MachiningFeature]
+  - [SLOTS, MachiningFeature]
+  - [CORNER_NOTCHES, MachiningFeature]
+  - [SIDE_NOTCHES, MachiningFeature]
+  - [GROOVES, MachiningFeature]
+  properties: []
+  terminal:
+    class: LocatedOnTerminal
+    definition: One resolved opening of the source feature and the host face it opens onto.
+    fields:
+    - name: terminalFeature
+      range: feature
+      definition: The feature whose opening this is.
+    - name: hostOwner
+      range: feature
+      definition: The feature that owns the host face.
+    - name: hostFace
+      range: face
+      definition: The host face.
+    - name: hostSurfaceType
+      range: xsd:string
+      definition: Surface type of the host face.
+    - name: hostSurfaceNormal
+      range: xsd:string
+      definition: Outward normal of the host face at the opening, three components.
+    - name: terminalRole
+      range: xsd:string
+      definition: Which opening of the source feature this is.
+- label: INTERSECTS
+  definition: The removal volumes of two hole-like features meet, proven by a B-Rep edge their walls share.
+  directed: false
+  method: B-Rep topology of the faces the two features own
+  allowedPairs:
+  - [STEP, STEP]
+  - [STEP, HOLES]
+  - [HOLES, HOLES]
+  properties:
+  - name: crossingAngle
+    range: xsd:decimal
+    unit: deg
+    definition: Angle between the two feature axes.
+- label: POCKET_CLEARANCE
+  definition: Shortest remaining material distance between the side walls of two pockets whose wall sets are separated.
+  directed: false
+  method: kernel distance between the two side-wall face sets
+  allowedPairs:
+  - [POCKETS, POCKETS]
+  properties:
+  - name: pocketClearance
+    range: xsd:decimal
+    unit: mm
+    definition: Shortest distance between the two side-wall face sets.
+- label: SLOT_CLEARANCE
+  definition: Shortest distance between the opening boundaries of two slots whose boundaries are separated.
+  directed: false
+  method: B-Rep topology and polyline distance of the two opening boundaries
+  allowedPairs:
+  - [SLOTS, SLOTS]
+  properties:
+  - name: slotClearance
+    range: xsd:decimal
+    unit: mm
+    definition: Shortest distance between the two opening boundaries.

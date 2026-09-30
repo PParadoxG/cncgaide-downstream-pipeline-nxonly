@@ -1,0 +1,97 @@
+head:
+  definedBy: pipeline
+  form: Each threshold is an individual with one value (or, for a set, its members) and a unit. A rule reads a
+    threshold by its symbol; a value is never written into a rule.
+thresholds:
+- symbol: t_hole_ld
+  value: 4
+  unit: null
+  definition: Maximum depth-to-diameter ratio of a hole section.
+- symbol: t_pocket_ld
+  value: 5
+  unit: null
+  definition: Maximum ratio of pocket depth to its most restrictive width.
+- symbol: t_boss_diameter
+  value: 3.0
+  unit: mm
+  definition: Minimum diameter of a round boss.
+- symbol: t_boss_hd
+  value: 4
+  unit: null
+  definition: Maximum ratio of round-boss height to diameter.
+- symbol: t_corner_radius
+  value: 1.0
+  unit: mm
+  definition: Minimum concave internal corner radius of a pocket.
+- symbol: t_floor
+  value: 2.0
+  unit: mm
+  definition: Minimum remaining floor thickness below a pocket or a blind hole.
+- symbol: t_hole_web
+  value: 2.0
+  unit: mm
+  definition: Minimum material web between two parallel holes.
+- symbol: t_pocket_gap
+  value: 3.0
+  unit: mm
+  definition: Minimum side-wall clearance between two pockets.
+- symbol: t_slot_gap
+  value: 3.0
+  unit: mm
+  definition: Minimum opening clearance between two slots.
+- symbol: t_slot_width
+  value: 3.0
+  unit: mm
+  definition: Minimum slot width.
+- symbol: t_hole_near
+  value: 3
+  unit: null
+  definition: Two holes are nearby when their axis spacing is at most this multiple of the larger base diameter.
+- symbol: t_corner_depth_ratio
+  value: 0.33
+  unit: null
+  definition: Minimum ratio of pocket corner radius to pocket depth.
+- symbol: t_pocket_entry_depth
+  value: 10
+  unit: mm
+  definition: Pocket depth from which a plunge entry hole is expected.
+- symbol: t_slot_ld
+  value: 4
+  unit: null
+  definition: Maximum ratio of slot depth to slot width.
+- symbol: t_boss_clearance
+  value: 3.0
+  unit: mm
+  definition: Minimum free space around a boss.
+- symbol: t_boss_slenderness
+  value: 10
+  unit: null
+  definition: Maximum ratio of rectangular-boss height to its minimum thickness.
+- symbol: t_throughcut_corner_radius
+  value: 3.0
+  unit: mm
+  definition: Minimum concave internal corner radius of a through cut.
+- symbol: t_crossing_angle
+  value: 45
+  unit: deg
+  definition: Minimum crossing angle between two intersecting holes.
+- symbol: t_min_wall
+  value: 1.0
+  unit: mm
+  definition: Minimum remaining wall thickness around a removal feature.
+- symbol: T_v_tool_angles
+  members: [30, 45, 60, 90, 120]
+  unit: deg
+  definition: Included angles of standard V form tools.
+- symbol: tol_diameter
+  value: 0.05
+  unit: mm
+  definition: Two diameters within this distance count as one diameter.
+- symbol: tol_angle
+  value: 1.0
+  unit: deg
+  definition: Two angles within this distance count as one angle.
+- symbol: tol_draft_zero
+  value: 0.5
+  unit: deg
+  definition: A wall within this angle of vertical counts as vertical.
